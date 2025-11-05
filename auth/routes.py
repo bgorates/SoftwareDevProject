@@ -67,3 +67,32 @@ You’ve been invited to join Shiftly as a {user.user_role}.
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send email: {e}")
     
     return {"message": f"Invite sent to {user.email}"}
+
+@auth_router.post("/accept_invite", response_model=dict)
+async def accept_invite(data: Annotated[AcceptInvite, Body ()], 
+                        db: Annotated[asyncpg.Connection, Depends(get_db)]):
+    try:
+        verify_type= verify_token_type(data.token, "invite")
+        payload = TokenPayload(**verify_type)
+        token: InviteToken = await token_in_db(db, data.token) 
+        if not token:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token missing.")
+        
+        if datetime.now(timezone.utc) > payload.exp: #using timezone.utc does not cause issues check why since when sending the invite, it does
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired token. Ask your admin for a new token")
+
+        user_id = payload.id
+        user:UserInDB = await user_in_db(db, id=user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        hashed_pass = hash_password(data.new_password)
+        user_query = f"UPDATE users SET pwd_hash = $1, is_active = {True} WHERE id= $2"
+        payload = jwt.decode(data.token,SECRET_KEY, algorithms=algorithm)
+        jti = payload.get('jti')
+        activate_user = await asyncSQLRepo(conn=db, query=user_query, params=(hashed_pass, user_id,)).execute()
+        token_query = f"UPDATE invite_token SET used_at = $1 WHERE jti = $2"
+        set_used_time = await asyncSQLRepo(conn=db, query=token_query, params=(datetime.now(), jti,)).execute()
+        return {"message": "Account activated successfully! Click here to login"}
+        
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite token")
