@@ -96,3 +96,31 @@ async def accept_invite(data: Annotated[AcceptInvite, Body ()],
         
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite token")
+
+ACCESS_EXPIRY_DAYS = 4
+@auth_router.post("/login_token", response_model=Token)
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+                                  db: Annotated[asyncpg.Connection, Depends(get_db)]) -> Token:
+    user: UserInDB= await authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="User account is not active"
+        )
+    payload = TokenPayload(
+        sub= user.username,
+        id=user.id,
+        email=user.email,
+        role = user.user_role,
+        type = "access"
+    )
+    access_token_expires = timedelta(days=ACCESS_EXPIRY_DAYS)
+    access_token = create_jwt(data=payload, expiry=access_token_expires)
+    store_access_token = await store_token(payload, access_token, db)
+    return Token(access_token=access_token, token_type="bearer", role=user.user_role)
