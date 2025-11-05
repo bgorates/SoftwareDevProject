@@ -124,3 +124,18 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
     access_token = create_jwt(data=payload, expiry=access_token_expires)
     store_access_token = await store_token(payload, access_token, db)
     return Token(access_token=access_token, token_type="bearer", role=user.user_role)
+
+@auth_router.get("/accept_invite", response_model=dict)
+async def get_invite(token:str, db: Annotated[asyncpg.Connection, Depends(get_db)]):
+    try:
+        payload = verify_token_type(token, "invite")
+        user_id = payload.get("id")
+        token = await token_in_db(db, token)
+        if not token:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite does not exist")
+        user: UserInDB = await user_in_db(db,id=user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return {"email": user.email}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired invite token")
