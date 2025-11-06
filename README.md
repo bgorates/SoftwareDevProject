@@ -167,9 +167,8 @@ These define **how** the system performs — its quality attributes and design c
 
 ## 🧑‍💻 Contributors
 
-- Maua
-- Ibrahim
-- Gorates
+- Maua Imani
+- Ibrahim Gashash
+- Batu Gorates
 
 ---
-
