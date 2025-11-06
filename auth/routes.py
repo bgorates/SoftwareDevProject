@@ -2,21 +2,21 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 import os
-import secrets
+
 import asyncpg
 from typing import Annotated
 from datetime import timedelta, datetime, timezone
-from app.auth.security import authenticate_user, user_in_db, verify_token_type, create_jwt, token_in_db, get_user, required_roles, store_token
 from app.auth.models import Token, UserInDB, TokenPayload, UserInvite, AcceptInvite, InviteToken, sendRequest, createUser, UserRole
-from app.database.database import get_db, asyncSQLRepo
-from app.auth.utils import send_email, hash_password, generate_temporary_password
+#from app.database.database import get_db, asyncSQLRepo
+#from app.auth.utils import send_email, hash_password, generate_temporary_password
+#from app.auth.security import authenticate_user, user_in_db, verify_token_type, create_jwt, token_in_db, get_user, required_roles, store_token
 
 auth_router = APIRouter()
 
 SECRET_KEY = os.getenv("KEY")
 algorithm = "HS256"
 
-
+auth_router = APIRouter()
 @auth_router.post("/create", response_model=UserInvite)
 async def create_user(user: Annotated[createUser, Body()],
                        db: Annotated[asyncpg.Connection, Depends(get_db)],
