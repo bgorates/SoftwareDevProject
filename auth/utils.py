@@ -34,3 +34,22 @@ def generate_temporary_password():
     alphabet = string.ascii_letters + string.digits + string.punctuation
     temporary = ''.join(secrets.choice(alphabet) for _ in range(12))
     return temporary
+
+
+def send_email(to_email:str, subject: str, body: str):
+
+    msg = MIMEMultipart()
+    msg["From"] = SMTP_USER
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+            print(f"Email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        raise
