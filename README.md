@@ -70,6 +70,24 @@ The system provides a complete backend solution with authentication, database ma
 - **API Documentation**: Auto-generated OpenAPI (Swagger UI)
 - **Version Control**: Git
 
+## 📁 Project Structure
+
+```
+Scheduler App/
+├── frontend/           # Frontend application
+│   ├── index.html     # Entry point
+│   ├── css/           # Stylesheets
+│   ├── js/            # JavaScript files
+│   └── pages/         # HTML pages
+├── backend/           # Backend application
+│   ├── authentication/  # Auth routes and services
+│   ├── config/         # Configuration
+│   ├── core/           # Core business logic
+│   ├── database/       # Database models and sessions
+│   └── requirements.txt
+└── main.py            # FastAPI application entry point
+```
+
 ## Setup
 
 Follow these instructions to get Shiftly running locally.
@@ -92,7 +110,7 @@ venv\Scripts\activate     # Windows
 ### 3. Install dependencies
 
 ```bash
-pip install -r app/requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ### 4. Set up environment variables
@@ -129,7 +147,7 @@ Then create the tables:
 alembic upgrade head
 
 # Or create tables programmatically
-python -c "from app.database.auth import Base; from app.database.models import Base as ModelsBase; from app.database.session import engine; Base.metadata.create_all(bind=engine); ModelsBase.metadata.create_all(bind=engine)"
+python -c "from backend.database.auth import Base; from backend.database.models import Base as ModelsBase; from backend.database.session import engine; Base.metadata.create_all(bind=engine); ModelsBase.metadata.create_all(bind=engine)"
 ```
 
 ### 6. Run the FastAPI server
