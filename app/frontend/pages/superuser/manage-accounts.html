@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Accounts - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>Manage Accounts</h1>
+                    <p style="color: var(--text-secondary); margin-top: 8px;">View and manage all business accounts</p>
+                </div>
+                <a href="create-business-account.html" class="btn btn-primary">Create New Account</a>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+            <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+            
+            <div class="table-container" id="accountsTable" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Business Name</th>
+                            <th>Admin Email</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountsTableBody">
+                        <!-- Accounts will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h3>No accounts found</h3>
+                <p>Create your first business account to get started</p>
+                <a href="create-business-account.html" class="btn btn-primary">Create Account</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated() || getUserRole() !== 'superuser') {
+            window.location.href = 'superuser-login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = 'superuser-login.html';
+            }
+        }
+
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const accountsTable = document.getElementById('accountsTable');
+        const accountsTableBody = document.getElementById('accountsTableBody');
+        const emptyState = document.getElementById('emptyState');
+
+        async function loadAccounts() {
+            loadingSpinner.style.display = 'flex';
+            errorMessage.style.display = 'none';
+            accountsTable.style.display = 'none';
+            emptyState.style.display = 'none';
+
+            try {
+                // Fetch all managers (users with manager role)
+                const accounts = await api.listUsers('manager');
+                renderAccounts(accounts);
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+                errorMessage.textContent = error.message || 'Failed to load accounts';
+                errorMessage.style.display = 'flex';
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'flex';
+        }
+
+        function renderAccounts(accounts) {
+            if (!accounts || accounts.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            accountsTableBody.innerHTML = accounts.map(account => `
+                <tr>
+                    <td>${account.business_name || account.firstname + ' ' + account.lastname}</td>
+                    <td>${account.email}</td>
+                    <td>
+                        <span class="badge ${getStatusBadgeClass(account.status)}">
+                            ${account.status || 'Active'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            ${account.status === 'Pending invitation' ? `
+                                <button class="action-btn action-btn-primary" onclick="resendInvite(${account.id})">Resend Invite</button>
+                            ` : ''}
+                            <button class="action-btn action-btn-danger" onclick="disableAccount(${account.id})">Disable</button>
+                            <button class="action-btn action-btn-primary" onclick="viewProfile(${account.id})">View Profile</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            accountsTable.style.display = 'block';
+        }
+
+        function getStatusBadgeClass(status) {
+            switch(status) {
+                case 'Active': return 'badge-success';
+                case 'Pending invitation': return 'badge-warning';
+                case 'Disabled': return 'badge-danger';
+                default: return 'badge-secondary';
+            }
+        }
+
+        async function resendInvite(userId) {
+            if (!confirm('Resend invitation to this user?')) return;
+            
+            try {
+                await api.sendInvite(userId);
+                showNotification('Invitation resent successfully', 'success');
+                loadAccounts();
+            } catch (error) {
+                showNotification(error.message || 'Failed to resend invitation', 'error');
+            }
+        }
+
+        async function disableAccount(userId) {
+            if (!confirm('Are you sure you want to disable this account?')) return;
+            
+            try {
+                // Note: Disable endpoint not yet implemented
+                showNotification('Disable account functionality not yet implemented', 'warning');
+            } catch (error) {
+                showNotification(error.message || 'Failed to disable account', 'error');
+            }
+        }
+
+        function viewProfile(userId) {
+            // Optional: Navigate to profile page
+            showNotification('View profile functionality not yet implemented', 'info');
+        }
+
+        // Load accounts on page load
+        loadAccounts();
+    </script>
+        <script src="../../components/navbar.js"></script>
+</body>
+</html>
+

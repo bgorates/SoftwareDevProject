@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SlotMeIn - Professional Shift Scheduling System">
+    <title>SlotMeIn - Shift Scheduling System</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/login.css">
+    <style>
+        .welcome-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+        }
+        
+        .welcome-card {
+            background: white;
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .welcome-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: var(--primary-color);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .welcome-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #000000;
+            margin-bottom: 12px;
+        }
+        
+        .welcome-subtitle {
+            color: #000000;
+            margin-bottom: 32px;
+        }
+        
+        .welcome-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .welcome-actions .btn {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-container">
+        <div class="welcome-card">
+            <div class="welcome-logo">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 12L32 20H28V32H20V20H16L24 12Z" fill="white"/>
+                    <path d="M12 36H36V40H12V36Z" fill="white" fill-opacity="0.8"/>
+                </svg>
+            </div>
+            <h1 class="welcome-title">Welcome to SlotMeIn</h1>
+            <p class="welcome-subtitle">Professional Shift Scheduling System</p>
+            <div class="welcome-actions">
+                <a href="pages/auth/login.html" class="btn btn-primary btn-lg">User Login</a>
+                <a href="pages/auth/superuser-login.html" class="btn btn-secondary btn-lg">Superuser Login</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

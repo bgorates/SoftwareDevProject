@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pending Invitations - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <h1>Pending Invitations</h1>
+            <p style="color: var(--text-secondary); margin-top: 8px;">View and manage all outstanding invites</p>
+        </div>
+
+        <div class="page-content">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+            <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+            
+            <div class="table-container" id="invitationsTable" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Invitation Date</th>
+                            <th>Expiration Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invitationsTableBody">
+                        <!-- Invitations will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M3 8L10.89 13.26C11.2187 13.4793 11.6049 13.5963 12 13.5963C12.3951 13.5963 12.7813 13.4793 13.11 13.26L21 8M5 19H19C19.5304 19 20.0391 18.7893 20.4142 18.4142C20.7893 18.0391 21 17.5304 21 17V7C21 6.46957 20.7893 5.96086 20.4142 5.58579C20.0391 5.21071 19.5304 5 19 5H5C4.46957 5 3.96086 5.21071 3.58579 5.58579C3.21071 5.96086 3 6.46957 3 7V17C3 17.5304 3.21071 18.0391 3.58579 18.4142C3.96086 18.7893 4.46957 19 5 19Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h3>No pending invitations</h3>
+                <p>All invitations have been processed</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated() || getUserRole() !== 'superuser') {
+            window.location.href = 'superuser-login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = 'superuser-login.html';
+            }
+        }
+
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const invitationsTable = document.getElementById('invitationsTable');
+        const invitationsTableBody = document.getElementById('invitationsTableBody');
+        const emptyState = document.getElementById('emptyState');
+
+        async function loadInvitations() {
+            loadingSpinner.style.display = 'flex';
+            errorMessage.style.display = 'none';
+            invitationsTable.style.display = 'none';
+            emptyState.style.display = 'none';
+
+            try {
+                // Note: This endpoint needs to be created in backend
+                // GET /users/pending_invites or similar
+                showError('Backend endpoint for pending invitations not yet implemented.');
+                
+                // When available:
+                // const invitations = await apiRequest('/users/pending_invites', { method: 'GET' });
+                // renderInvitations(invitations);
+                
+            } catch (error) {
+                errorMessage.textContent = error.message || 'Failed to load invitations';
+                errorMessage.style.display = 'flex';
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        function renderInvitations(invitations) {
+            if (!invitations || invitations.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            invitationsTableBody.innerHTML = invitations.map(invite => `
+                <tr>
+                    <td>${invite.email}</td>
+                    <td>${formatDateTime(invite.created_at || invite.invitation_date)}</td>
+                    <td>${formatDateTime(invite.expires_at || invite.expiration_date)}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="action-btn action-btn-primary" onclick="resendInvite(${invite.user_id || invite.id})">Resend Invite</button>
+                            <button class="action-btn action-btn-danger" onclick="revokeInvite(${invite.id})">Revoke Invite</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            invitationsTable.style.display = 'block';
+        }
+
+        async function resendInvite(userId) {
+            if (!confirm('Resend invitation to this user?')) return;
+            
+            try {
+                await api.sendInvite(userId);
+                showNotification('Invitation resent successfully', 'success');
+                loadInvitations();
+            } catch (error) {
+                showNotification(error.message || 'Failed to resend invitation', 'error');
+            }
+        }
+
+        async function revokeInvite(inviteId) {
+            if (!confirm('Are you sure you want to revoke this invitation?')) return;
+            
+            try {
+                // Note: Revoke endpoint not yet implemented
+                showNotification('Revoke invitation functionality not yet implemented', 'warning');
+            } catch (error) {
+                showNotification(error.message || 'Failed to revoke invitation', 'error');
+            }
+        }
+
+        // Load invitations on page load
+        loadInvitations();
+    </script>
+        <script src="../../components/navbar.js"></script>
+</body>
+</html>
+

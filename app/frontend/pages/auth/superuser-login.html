@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SlotMeIn - Superuser Login</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/pages/auth/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="48" height="48" rx="12" fill="#4F46E5"/>
+                        <path d="M24 12L32 20H28V32H20V20H16L24 12Z" fill="white"/>
+                        <path d="M12 36H36V40H12V36Z" fill="white" fill-opacity="0.8"/>
+                    </svg>
+                </div>
+                <h1>Superuser Login</h1>
+                <p class="subtitle">SlotMeIn Administration</p>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div id="errorMessage" class="error-message"></div>
+                <div id="successMessage" class="success-message"></div>
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z" fill="#6B7280"/>
+                            <path d="M10 12C5.58172 12 2 13.7909 2 16V20H18V16C18 13.7909 14.4183 12 10 12Z" fill="#6B7280"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            placeholder="Enter your username" 
+                            required 
+                            autocomplete="username"
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 2C8.34315 2 7 3.34315 7 5V7H5C3.89543 7 3 7.89543 3 9V16C3 17.1046 3.89543 18 5 18H15C16.1046 18 17 17.1046 17 16V9C17 7.89543 16.1046 7 15 7H13V5C13 3.34315 11.6569 2 10 2ZM10 4C10.5523 4 11 4.44772 11 5V7H9V5C9 4.44772 9.44772 4 10 4Z" fill="#6B7280"/>
+                        </svg>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            placeholder="Enter your password" 
+                            required 
+                            autocomplete="current-password"
+                        >
+                        <button type="button" class="toggle-password" id="togglePassword" aria-label="Toggle password visibility">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 4C6 4 3.27 6.11 2 9C3.27 11.89 6 14 10 14C14 14 16.73 11.89 18 9C16.73 6.11 14 4 10 4ZM10 12C8.34 12 7 10.66 7 9C7 7.34 8.34 6 10 6C11.66 6 13 7.34 13 9C13 10.66 11.66 12 10 12ZM10 7.5C9.17 7.5 8.5 8.17 8.5 9C8.5 9.83 9.17 10.5 10 10.5C10.83 10.5 11.5 9.83 11.5 9C11.5 8.17 10.83 7.5 10 7.5Z" fill="#6B7280"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="login-button" id="loginButton">
+                    <span class="button-text">Sign In</span>
+                    <span class="button-loader" style="display: none;">
+                        <svg class="spinner" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="10" cy="10" r="8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-dasharray="31.416" stroke-dashoffset="31.416">
+                                <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/>
+                                <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/>
+                            </circle>
+                        </svg>
+                    </span>
+                </button>
+            </form>
+        </div>
+
+        <div class="background-decoration">
+            <div class="decoration-circle circle-1"></div>
+            <div class="decoration-circle circle-2"></div>
+            <div class="decoration-circle circle-3"></div>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/main.js"></script>
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Same login logic as regular login but redirects to superuser dashboard
+            const loginForm = document.getElementById('loginForm');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const togglePasswordBtn = document.getElementById('togglePassword');
+            const loginButton = document.getElementById('loginButton');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+
+            if (!loginForm || !usernameInput || !passwordInput) {
+                console.error('Login form elements not found');
+                return;
+            }
+
+            if (!errorMessage) {
+                console.error('Error message element not found!');
+            } else {
+                console.log('Error message element found:', errorMessage);
+            }
+
+            togglePasswordBtn.addEventListener('click', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+            });
+
+            function showError(message) {
+                if (!errorMessage) {
+                    console.error('Error message element not found');
+                    alert(message);
+                    return;
+                }
+                if (!message || message.trim() === '') {
+                    // Don't show empty messages
+                    hideMessages();
+                    return;
+                }
+                console.log('Showing error:', message);
+                errorMessage.textContent = message;
+                // Remove any inline styles that might hide it
+                errorMessage.removeAttribute('style');
+                // Add show class and set display
+                errorMessage.classList.add('show');
+                errorMessage.style.setProperty('display', 'flex', 'important');
+                errorMessage.style.setProperty('visibility', 'visible', 'important');
+                errorMessage.style.setProperty('opacity', '1', 'important');
+                
+                if (successMessage) {
+                    successMessage.classList.remove('show');
+                    successMessage.style.setProperty('display', 'none', 'important');
+                }
+                
+                // Verify it's visible
+                const computed = window.getComputedStyle(errorMessage);
+                console.log('Computed display:', computed.display);
+                console.log('Computed visibility:', computed.visibility);
+                console.log('Has show class:', errorMessage.classList.contains('show'));
+                
+                // Force reflow
+                errorMessage.offsetHeight;
+                
+                setTimeout(() => {
+                    errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
+
+            function showSuccess(message) {
+                if (!successMessage) {
+                    console.error('Success message element not found');
+                    return;
+                }
+                successMessage.textContent = message;
+                successMessage.classList.add('show');
+                successMessage.style.setProperty('display', 'flex', 'important');
+                if (errorMessage) {
+                    errorMessage.classList.remove('show');
+                    errorMessage.style.setProperty('display', 'none', 'important');
+                }
+            }
+
+            function hideMessages() {
+                if (errorMessage) {
+                    errorMessage.classList.remove('show');
+                    errorMessage.style.setProperty('display', 'none', 'important');
+                    errorMessage.textContent = '';
+                }
+                if (successMessage) {
+                    successMessage.classList.remove('show');
+                    successMessage.style.setProperty('display', 'none', 'important');
+                    successMessage.textContent = '';
+                }
+            }
+
+            function setLoading(loading) {
+                loginButton.disabled = loading;
+                const buttonText = loginButton.querySelector('.button-text');
+                const buttonLoader = loginButton.querySelector('.button-loader');
+                if (loading) {
+                    buttonText.style.display = 'none';
+                    buttonLoader.style.display = 'flex';
+                } else {
+                    buttonText.style.display = 'inline';
+                    buttonLoader.style.display = 'none';
+                }
+            }
+
+            function storeToken(token, role) {
+                localStorage.setItem('access_token', token);
+                localStorage.setItem('token_type', 'bearer');
+                localStorage.setItem('user_role', role);
+                localStorage.setItem('login_time', new Date().toISOString());
+            }
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideMessages();
+                setLoading(true);
+
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+
+                if (!username || !password) {
+                    showError('Please enter both email and password');
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    const data = await api.login(username, password);
+                    
+                    if (data.access_token) {
+                        const role = data.role || 'user';
+                        if (role !== 'superuser') {
+                            showError('Access denied. Superuser privileges required.');
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        storeToken(data.access_token, role);
+                        showSuccess('Login successful! Redirecting...');
+                        
+                        setTimeout(() => {
+                            window.location.href = '../superuser/superuser-dashboard.html';
+                        }, 1500);
+                    } else {
+                        showError('Invalid response from server');
+                        setLoading(false);
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    console.log('Error type:', typeof error);
+                    console.log('Error message:', error?.message);
+                    
+                    // Extract error message
+                    let errorMsg = 'An unexpected error occurred. Please try again.';
+                    if (error instanceof Error) {
+                        errorMsg = error.message;
+                    } else if (typeof error === 'string') {
+                        errorMsg = error;
+                    } else if (error?.message) {
+                        errorMsg = error.message;
+                    }
+                    
+                    console.log('Extracted error message:', errorMsg);
+                    
+                        // Show user-friendly error messages
+                        if (errorMsg.includes('Invalid username or password') || 
+                            errorMsg.includes('Invalid') || 
+                            errorMsg.includes('401')) {
+                            showError('Invalid username or password. Please check your credentials and try again.');
+                    } else if (errorMsg.includes('not active') || errorMsg.includes('403')) {
+                        showError('Your account is not active. Please contact your administrator.');
+                    } else if (errorMsg.includes('connect') || errorMsg.includes('network')) {
+                        showError('Unable to connect to server. Please check your internet connection.');
+                    } else {
+                        showError(errorMsg);
+                    }
+                    setLoading(false);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

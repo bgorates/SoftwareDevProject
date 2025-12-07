@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Published Schedule - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <style>
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+        
+        .schedule-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+        }
+        
+        .employee-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .employee-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>Published Schedule</h1>
+                    <p style="color: var(--text-secondary); margin-top: 8px;" id="weekRange">Read-only view of the final schedule</p>
+                </div>
+                <a href="schedule-history.html" class="btn btn-secondary">View History</a>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+            <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+            
+            <div id="scheduleContainer" style="display: none;">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Shift</th>
+                            <th>Employee(s)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scheduleTableBody">
+                        <!-- Schedule will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated()) {
+            window.location.href = '../auth/login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = '../auth/login.html';
+            }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const weekStart = urlParams.get('week_start');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const scheduleContainer = document.getElementById('scheduleContainer');
+        const scheduleTableBody = document.getElementById('scheduleTableBody');
+        const weekRangeEl = document.getElementById('weekRange');
+
+        async function loadSchedule() {
+            if (!weekStart) {
+                errorMessage.textContent = 'Week start date is required';
+                errorMessage.style.display = 'flex';
+                return;
+            }
+
+            loadingSpinner.style.display = 'flex';
+            errorMessage.style.display = 'none';
+            scheduleContainer.style.display = 'none';
+
+            try {
+                const schedule = await api.viewSchedule(weekStart);
+                renderSchedule(schedule);
+                
+                if (weekStart) {
+                    const start = new Date(weekStart);
+                    weekRangeEl.textContent = `Week: ${formatWeekRange(start)}`;
+                }
+            } catch (error) {
+                errorMessage.textContent = error.message || 'Failed to load schedule';
+                errorMessage.style.display = 'flex';
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        function renderSchedule(schedule) {
+            // This will depend on the schedule data structure from backend
+            // For now, showing a placeholder structure
+            if (!schedule || schedule.length === 0) {
+                scheduleTableBody.innerHTML = '<tr><td colspan="3" class="text-center">No schedule data available</td></tr>';
+            } else {
+                scheduleTableBody.innerHTML = schedule.map(item => `
+                    <tr>
+                        <td>${formatDate(item.date || item.shift_date)}</td>
+                        <td>${item.shift_name || item.shift} (${formatTime(item.start_time)} - ${formatTime(item.end_time)})</td>
+                        <td>
+                            <div class="employee-list">
+                                ${(item.employees || []).map(emp => 
+                                    `<span class="employee-badge">${emp.firstname} ${emp.lastname}</span>`
+                                ).join('')}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            scheduleContainer.style.display = 'block';
+        }
+
+        // Load schedule on page load
+        if (weekStart) {
+            loadSchedule();
+        } else {
+            errorMessage.textContent = 'Please provide a week start date';
+            errorMessage.style.display = 'flex';
+        }
+    </script>
+        <script src="../../components/navbar.js"></script>
+</body>
+</html>
+

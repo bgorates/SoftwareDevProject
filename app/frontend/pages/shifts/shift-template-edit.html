@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create/Edit Shift Template - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <h1 id="pageTitle">Create Shift Template</h1>
+            <p style="color: var(--text-secondary); margin-top: 8px;" id="pageSubtitle">Define a new shift template</p>
+        </div>
+
+        <div class="page-content">
+            <form id="templateForm">
+                <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+                <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+
+                <div class="form-group">
+                    <label for="period_id">Shift Period *</label>
+                    <select id="period_id" class="form-control" required>
+                        <option value="">Select shift period</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="shift_start">Start Time *</label>
+                    <input type="time" id="shift_start" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="shift_end">End Time *</label>
+                    <input type="time" id="shift_end" class="form-control" required>
+                </div>
+
+                <div class="card-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='shift-template-list.html'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated()) {
+            window.location.href = '../auth/login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = '../auth/login.html';
+            }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const templateId = urlParams.get('id');
+        const isEdit = !!templateId;
+
+        const form = document.getElementById('templateForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const submitBtn = document.getElementById('submitBtn');
+        const pageTitle = document.getElementById('pageTitle');
+        const pageSubtitle = document.getElementById('pageSubtitle');
+        const periodSelect = document.getElementById('period_id');
+        const shiftStartInput = document.getElementById('shift_start');
+        const shiftEndInput = document.getElementById('shift_end');
+        
+        // Store loaded periods for validation
+        let loadedPeriods = [];
+
+        if (isEdit) {
+            pageTitle.textContent = 'Edit Shift Template';
+            pageSubtitle.textContent = 'Update shift template information';
+        }
+
+        // Load shift periods - only show pre-defined AM, PM, Lounge
+        async function loadPeriods() {
+            try {
+                const periods = await api.getPeriods();
+                console.log('Loaded periods:', periods);
+                
+                // Pre-defined shift period options
+                const predefinedShifts = ['am', 'pm', 'lounge'];
+                const shiftDisplayNames = {
+                    'am': 'AM',
+                    'pm': 'PM',
+                    'lounge': 'Lounge'
+                };
+                
+                // Filter to only show predefined periods
+                const predefinedPeriods = Array.isArray(periods) 
+                    ? periods.filter(p => {
+                        const shiftName = (p.shift_name || '').toLowerCase();
+                        return predefinedShifts.includes(shiftName);
+                    })
+                    : [];
+                
+                if (predefinedPeriods.length === 0) {
+                    periodSelect.innerHTML = '<option value="">No shift periods available</option>';
+                    periodSelect.disabled = true;
+                    showError('The pre-defined shift periods (AM, PM, Lounge) are not configured. Run the create_shift_periods.py script or execute create_shift_periods.sql in your database to set them up.');
+                    return;
+                }
+                
+                // Ensure we have all three required periods
+                const foundShiftNames = predefinedPeriods.map(p => (p.shift_name || '').toLowerCase());
+                const missingShifts = predefinedShifts.filter(s => !foundShiftNames.includes(s));
+                if (missingShifts.length > 0) {
+                    const missingDisplay = missingShifts.map(s => shiftDisplayNames[s]).join(', ');
+                    showError(`Some shift periods are missing: ${missingDisplay}. Please contact your administrator.`);
+                }
+                
+                periodSelect.disabled = false;
+                periodSelect.innerHTML = '<option value="">Select shift period</option>';
+                
+                // Store periods for validation
+                loadedPeriods = predefinedPeriods;
+                
+                // Add options in order: AM, PM, Lounge
+                predefinedShifts.forEach(shiftName => {
+                    const period = predefinedPeriods.find(p => (p.shift_name || '').toLowerCase() === shiftName);
+                    if (period) {
+                        const displayName = shiftDisplayNames[shiftName] || shiftName.toUpperCase();
+                        periodSelect.innerHTML += `<option value="${period.id}">${displayName}</option>`;
+                    }
+                });
+                
+                // Add event listener to show period time range when selected
+                periodSelect.addEventListener('change', updatePeriodTimeHint);
+            } catch (error) {
+                console.error('Failed to load periods:', error);
+                periodSelect.innerHTML = '<option value="">Error loading periods</option>';
+                periodSelect.disabled = true;
+                showError('Failed to load shift periods. Please refresh the page or contact your administrator.');
+            }
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.style.display = 'flex';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            successMessage.textContent = msg;
+            successMessage.style.display = 'flex';
+            errorMessage.style.display = 'none';
+        }
+        
+        function updatePeriodTimeHint() {
+            const selectedPeriodId = periodSelect.value;
+            if (!selectedPeriodId) return;
+            
+            const period = loadedPeriods.find(p => p.id == selectedPeriodId);
+            if (period && period.start_time && period.end_time) {
+                const startTime = formatTime(period.start_time);
+                const endTime = formatTime(period.end_time);
+                
+                // Update input placeholders or add hint
+                shiftStartInput.setAttribute('data-period-start', period.start_time);
+                shiftStartInput.setAttribute('data-period-end', period.end_time);
+                shiftEndInput.setAttribute('data-period-start', period.start_time);
+                shiftEndInput.setAttribute('data-period-end', period.end_time);
+                
+                // Add hint text below the period selector
+                let hintElement = document.getElementById('period-time-hint');
+                if (!hintElement) {
+                    hintElement = document.createElement('small');
+                    hintElement.id = 'period-time-hint';
+                    hintElement.style.cssText = 'color: var(--text-secondary); margin-top: 4px; display: block;';
+                    periodSelect.parentElement.appendChild(hintElement);
+                }
+                hintElement.textContent = `Valid time range: ${startTime} - ${endTime}`;
+            }
+        }
+
+        // Load template data if editing
+        if (isEdit) {
+            loadTemplate();
+        }
+
+        async function loadTemplate() {
+            try {
+                const template = await api.getTemplate(templateId);
+                console.log('Loaded template:', template);
+                
+                // Load periods first to ensure dropdown is populated
+                await loadPeriods();
+                
+                // Template has period object, need to get period_id from it
+                if (template.period && template.period.id) {
+                    periodSelect.value = template.period.id;
+                } else if (template.period && template.period.shift_name) {
+                    // If we have shift_name, find matching period in dropdown
+                    const shiftName = template.period.shift_name.toLowerCase();
+                    const option = Array.from(periodSelect.options).find(opt => {
+                        // Match by checking if the period's shift_name matches
+                        // We need to check the loaded periods
+                        return opt.value && opt.text.toLowerCase().includes(shiftName);
+                    });
+                    if (option) {
+                        periodSelect.value = option.value;
+                    }
+                }
+                
+                document.getElementById('shift_start').value = formatTime(template.shift_start);
+                document.getElementById('shift_end').value = formatTime(template.shift_end);
+            } catch (error) {
+                console.error('Error loading template:', error);
+                showError(error.message || 'Failed to load template data');
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            showError('');
+            showSuccess('');
+
+            const periodId = periodSelect.value;
+            const shiftStart = document.getElementById('shift_start').value;
+            const shiftEnd = document.getElementById('shift_end').value;
+
+            // Validation
+            if (!periodId || !shiftStart || !shiftEnd) {
+                showError('Please fill in all required fields');
+                submitBtn.disabled = false;
+                return;
+            }
+            
+            // Validate times are within the selected period
+            const selectedPeriod = loadedPeriods.find(p => p.id == parseInt(periodId));
+            if (selectedPeriod && selectedPeriod.start_time && selectedPeriod.end_time) {
+                const periodStart = formatTime(selectedPeriod.start_time);
+                const periodEnd = formatTime(selectedPeriod.end_time);
+                
+                // Helper function to convert time string to minutes for comparison
+                function timeToMinutes(timeStr) {
+                    const [hours, minutes] = timeStr.split(':').map(Number);
+                    return hours * 60 + minutes;
+                }
+                
+                // Helper function to check if time is within period (handles midnight crossing)
+                function isTimeInPeriod(timeStr, periodStartStr, periodEndStr) {
+                    const timeMins = timeToMinutes(timeStr);
+                    const periodStartMins = timeToMinutes(periodStartStr);
+                    const periodEndMins = timeToMinutes(periodEndStr);
+                    
+                    // Check if period crosses midnight (end < start)
+                    if (periodEndMins < periodStartMins) {
+                        // Period crosses midnight (e.g., 18:00 to 02:00)
+                        // Time is valid if it's >= start OR <= end
+                        return timeMins >= periodStartMins || timeMins <= periodEndMins;
+                    } else {
+                        // Normal period (e.g., 06:00 to 14:00)
+                        // Time is valid if it's >= start AND <= end
+                        return timeMins >= periodStartMins && timeMins <= periodEndMins;
+                    }
+                }
+                
+                // Check if start time is within period
+                if (!isTimeInPeriod(shiftStart, periodStart, periodEnd)) {
+                    showError(`Start time must be between ${periodStart} and ${periodEnd} for the selected shift period.`);
+                    submitBtn.disabled = false;
+                    return;
+                }
+                
+                // Check if end time is within period
+                if (!isTimeInPeriod(shiftEnd, periodStart, periodEnd)) {
+                    showError(`End time must be between ${periodStart} and ${periodEnd} for the selected shift period.`);
+                    submitBtn.disabled = false;
+                    return;
+                }
+            }
+
+            const formData = {
+                period_id: parseInt(periodId),
+                shift_start: shiftStart,
+                shift_end: shiftEnd,
+                role: 'server' // Default role since field is removed from UI but backend requires it
+            };
+
+            console.log('Submitting template data:', formData);
+
+            try {
+                if (isEdit) {
+                    await api.updateTemplate(templateId, formData);
+                    showSuccess('Template updated successfully!');
+                } else {
+                    await api.createTemplate(formData);
+                    showSuccess('Template created successfully!');
+                }
+                
+                setTimeout(() => {
+                    window.location.href = 'shift-template-list.html';
+                }, 1500);
+            } catch (error) {
+                showError(error.message || `Failed to ${isEdit ? 'update' : 'create'} template. Please try again.`);
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Load periods on page load
+        loadPeriods();
+    </script>
+        <script src="../../components/navbar.js"></script>
+</body>
+</html>
+

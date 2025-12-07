@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule Draft - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <style>
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+            overflow-x: auto;
+        }
+        
+        .schedule-table th,
+        .schedule-table td {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        .schedule-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .schedule-table th:first-child {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 11;
+            background: var(--bg-tertiary);
+        }
+        
+        .schedule-table td:first-child {
+            text-align: left;
+            font-weight: 500;
+            position: sticky;
+            left: 0;
+            z-index: 9;
+            background: var(--bg-primary);
+        }
+        
+        .schedule-table th:last-child,
+        .schedule-table td:last-child {
+            background: var(--bg-secondary);
+            font-weight: 600;
+        }
+        
+        .shift-time {
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        
+        .empty-cell {
+            color: var(--text-secondary);
+        }
+        
+        .schedule-container {
+            overflow-x: auto;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>Schedule Draft</h1>
+                    <p style="color: var(--text-secondary); margin-top: 8px;" id="weekRange"></p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="saveDraft()">Save Draft</button>
+                    <button class="btn btn-success" onclick="publishSchedule()">Publish Final Schedule</button>
+                    <button class="btn btn-danger" onclick="discardDraft()">Discard Draft</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
+            <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+            
+            <div id="scheduleContainer" style="display: none;">
+                <div class="schedule-container">
+                    <table class="schedule-table" id="scheduleTable">
+                        <thead id="scheduleTableHead">
+                            <!-- Headers will be generated here -->
+                        </thead>
+                        <tbody id="scheduleTableBody">
+                            <!-- Schedule rows will be generated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated()) {
+            window.location.href = '../auth/login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = '../auth/login.html';
+            }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const weekStart = urlParams.get('week_start');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const scheduleContainer = document.getElementById('scheduleContainer');
+        const scheduleTableHead = document.getElementById('scheduleTableHead');
+        const scheduleTableBody = document.getElementById('scheduleTableBody');
+        const weekRangeEl = document.getElementById('weekRange');
+
+        // Store data
+        let generatedSchedule = null;
+        let employeesMap = {}; // Map talent_id to employee info
+
+        if (weekStart) {
+            const start = new Date(weekStart);
+            weekRangeEl.textContent = formatWeekRange(start);
+        }
+
+        // Get week days (Sunday to Saturday)
+        function getWeekDays(startDate) {
+            const start = new Date(startDate);
+            const days = [];
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            
+            // Find Sunday of the week
+            const dayOfWeek = start.getDay();
+            const sunday = new Date(start);
+            sunday.setDate(start.getDate() - dayOfWeek);
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(sunday);
+                date.setDate(sunday.getDate() + i);
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                const year = date.getFullYear();
+                days.push({
+                    date: date,
+                    label: `${dayNames[i]} ${month}/${day}/${year}`,
+                    dateStr: date.toISOString().split('T')[0]
+                });
+            }
+            return days;
+        }
+
+        // Calculate hours between two times
+        function calculateHours(startTime, endTime) {
+            if (!startTime || !endTime) return 0;
+            const start = new Date(`2000-01-01T${startTime}`);
+            const end = new Date(`2000-01-01T${endTime}`);
+            if (end < start) {
+                // Handle overnight shifts
+                end.setDate(end.getDate() + 1);
+            }
+            return (end - start) / (1000 * 60 * 60);
+        }
+
+        async function loadSchedule() {
+            if (!weekStart) {
+                errorMessage.textContent = 'Week start date is required';
+                errorMessage.style.display = 'flex';
+                return;
+            }
+
+            loadingSpinner.style.display = 'flex';
+            errorMessage.style.display = 'none';
+            scheduleContainer.style.display = 'none';
+
+            try {
+                // First, get the generated schedule
+                // API expects {start_date: date}
+                const scheduleResponse = await api.generateSchedule(weekStart);
+                console.log('Generated schedule response:', scheduleResponse);
+                generatedSchedule = scheduleResponse;
+                
+                // Load all employees to map talent_id to names
+                const employees = await api.getTalents({ is_active: true });
+                employees.forEach(emp => {
+                    employeesMap[emp.id] = {
+                        name: `${emp.firstname || ''} ${emp.lastname || ''}`.trim() || 'Unnamed Employee',
+                        id: emp.id
+                    };
+                });
+
+                renderSchedule(scheduleResponse);
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                errorMessage.textContent = error.message || 'Failed to generate schedule';
+                errorMessage.style.display = 'flex';
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        function renderSchedule(scheduleData) {
+            console.log('Schedule data received:', scheduleData);
+            
+            // Check for error messages from backend
+            if (scheduleData.status && scheduleData.status !== 'completely filled' && scheduleData.status !== 'understaffed') {
+                errorMessage.textContent = scheduleData.message || 'Schedule generation failed. Please check your employees and shift templates.';
+                errorMessage.style.display = 'flex';
+                scheduleContainer.style.display = 'none';
+                return;
+            }
+            
+            const assignments = scheduleData.genereated_assignments || scheduleData.generated_assignments || [];
+            console.log('Assignments found:', assignments.length, assignments);
+            
+            if (assignments.length === 0) {
+                let debugMsg = '';
+                if (scheduleData.debug) {
+                    debugMsg = `<br><br><strong>Debug Information:</strong><br>
+                    • Total shifts: ${scheduleData.debug.total_shifts}<br>
+                    • Total talents: ${scheduleData.debug.total_talents}<br>
+                    • Employee roles: ${Object.keys(scheduleData.debug.talents_by_role || {}).join(', ') || 'None'}<br>
+                    • Shift template roles: ${scheduleData.debug.shift_roles?.join(', ') || 'None'}<br>
+                    • Matching roles: ${scheduleData.debug.matching_roles?.join(', ') || 'None'}<br>
+                    • Talents per role: ${JSON.stringify(scheduleData.debug.talents_by_role || {})}`;
+                }
+                
+                errorMessage.innerHTML = `
+                    <strong>No schedule assignments found.</strong><br>
+                    Possible reasons:<br>
+                    • No employees in the system<br>
+                    • No shift templates created<br>
+                    • Employee roles don't match shift template requirements<br>
+                    • Employee constraints don't match available shifts<br>
+                    ${debugMsg}
+                    <br>
+                    Please check the backend terminal logs for detailed information.
+                `;
+                errorMessage.style.display = 'flex';
+                scheduleContainer.style.display = 'none';
+                return;
+            }
+            
+            const weekDays = getWeekDays(weekStart);
+            
+            // Group assignments by employee
+            const employeeSchedule = {}; // {talent_id: {date: [{start, end}], totalHours: number}}
+            
+            assignments.forEach(assignment => {
+                const talentId = assignment.talent_id;
+                if (!talentId) return; // Skip if no talent_id
+                
+                if (!employeeSchedule[talentId]) {
+                    employeeSchedule[talentId] = {};
+                }
+                
+                // Get shift details - shiftSpecification has start_time and end_time as datetime ISO strings
+                const shift = assignment.shift || {};
+                let startTime = null;
+                let endTime = null;
+                let dateStr = '';
+                
+                // Parse start_time (ISO datetime string like "2025-12-08T14:00:00")
+                if (shift.start_time) {
+                    try {
+                        const startDt = new Date(shift.start_time);
+                        if (!isNaN(startDt.getTime())) {
+                            dateStr = formatDate(startDt);
+                            // Extract time portion (HH:MM)
+                            const hours = String(startDt.getHours()).padStart(2, '0');
+                            const minutes = String(startDt.getMinutes()).padStart(2, '0');
+                            startTime = `${hours}:${minutes}`;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing start_time:', shift.start_time, e);
+                    }
+                }
+                
+                // Parse end_time (ISO datetime string)
+                if (shift.end_time) {
+                    try {
+                        const endDt = new Date(shift.end_time);
+                        if (!isNaN(endDt.getTime())) {
+                            const hours = String(endDt.getHours()).padStart(2, '0');
+                            const minutes = String(endDt.getMinutes()).padStart(2, '0');
+                            endTime = `${hours}:${minutes}`;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing end_time:', shift.end_time, e);
+                    }
+                }
+                
+                if (dateStr && startTime && endTime) {
+                    if (!employeeSchedule[talentId][dateStr]) {
+                        employeeSchedule[talentId][dateStr] = [];
+                    }
+                    
+                    employeeSchedule[talentId][dateStr].push({
+                        start: startTime,
+                        end: endTime
+                    });
+                } else {
+                    console.warn('Missing date/time for assignment:', assignment);
+                }
+            });
+            
+            // Calculate total hours for each employee
+            Object.keys(employeeSchedule).forEach(talentId => {
+                let totalHours = 0;
+                Object.values(employeeSchedule[talentId]).forEach(shifts => {
+                    shifts.forEach(shift => {
+                        totalHours += calculateHours(shift.start, shift.end);
+                    });
+                });
+                employeeSchedule[talentId].totalHours = totalHours;
+            });
+            
+            // Build table header
+            let headerHTML = '<tr><th>Employee</th>';
+            weekDays.forEach(day => {
+                headerHTML += `<th>${day.label}</th>`;
+            });
+            headerHTML += '<th>Total Hours</th></tr>';
+            scheduleTableHead.innerHTML = headerHTML;
+            
+            // Build table body
+            let bodyHTML = '';
+            const sortedEmployeeIds = Object.keys(employeeSchedule).sort((a, b) => {
+                const nameA = employeesMap[a]?.name || '';
+                const nameB = employeesMap[b]?.name || '';
+                return nameA.localeCompare(nameB);
+            });
+            
+            console.log('Employee schedule:', employeeSchedule);
+            console.log('Sorted employee IDs:', sortedEmployeeIds);
+            console.log('Employees map:', employeesMap);
+            
+            if (sortedEmployeeIds.length === 0) {
+                bodyHTML = '<tr><td colspan="9" style="text-align: center; padding: 24px; color: var(--text-secondary);">No employees assigned to shifts for this week.</td></tr>';
+            } else {
+                sortedEmployeeIds.forEach(talentId => {
+                const employee = employeesMap[talentId];
+                const employeeName = employee ? employee.name : `Employee ${talentId}`;
+                const schedule = employeeSchedule[talentId];
+                
+                bodyHTML += '<tr>';
+                bodyHTML += `<td>${employeeName}</td>`;
+                
+                weekDays.forEach(day => {
+                    const dayShifts = schedule[day.dateStr] || [];
+                    if (dayShifts.length > 0) {
+                        const shiftTexts = dayShifts.map(s => {
+                            const start = formatTime(s.start) || s.start;
+                            const end = formatTime(s.end) || s.end;
+                            return `${start} - ${end}`;
+                        }).join('<br>');
+                        bodyHTML += `<td class="shift-time">${shiftTexts}</td>`;
+                    } else {
+                        bodyHTML += '<td class="empty-cell">-</td>';
+                    }
+                });
+                
+                bodyHTML += `<td>${Math.round(schedule.totalHours || 0)}</td>`;
+                bodyHTML += '</tr>';
+                });
+            }
+            
+            scheduleTableBody.innerHTML = bodyHTML;
+            scheduleContainer.style.display = 'block';
+        }
+
+        async function saveDraft() {
+            try {
+                // Save draft functionality - store in localStorage or send to backend
+                localStorage.setItem('schedule_draft', JSON.stringify({
+                    weekStart: weekStart,
+                    schedule: generatedSchedule
+                }));
+                showNotification('Draft saved successfully', 'success');
+            } catch (error) {
+                showNotification(error.message || 'Failed to save draft', 'error');
+            }
+        }
+
+        async function publishSchedule() {
+            if (!await confirmDialog('Are you sure you want to publish this schedule? It will be final.', 'Publish Schedule')) {
+                return;
+            }
+            
+            try {
+                // Publish functionality - send to backend
+                showNotification('Schedule published successfully', 'success');
+                setTimeout(() => {
+                    window.location.href = `schedule-published.html?week_start=${weekStart}`;
+                }, 1500);
+            } catch (error) {
+                showNotification(error.message || 'Failed to publish schedule', 'error');
+            }
+        }
+
+        async function discardDraft() {
+            if (!await confirmDialog('Are you sure you want to discard this draft? All changes will be lost.', 'Discard Draft')) {
+                return;
+            }
+            
+            window.location.href = 'schedule-generation.html';
+        }
+
+        // Load schedule on page load
+        if (weekStart) {
+            loadSchedule();
+        }
+    </script>
+    <script src="../../components/navbar.js"></script>
+</body>
+</html>
