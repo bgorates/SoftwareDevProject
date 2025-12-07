@@ -62,7 +62,7 @@ The system provides a complete backend solution with authentication, database ma
 
 - **Backend Framework**: FastAPI 0.116+
 - **Language**: Python 3.11+
-- **Database**: PostgreSQL with asyncpg
+- **Database**: SQLite (development) / PostgreSQL (production) with SQLAlchemy
 - **ORM**: SQLAlchemy 2.0+
 - **Authentication**: JWT (python-jose)
 - **Password Hashing**: bcrypt via passlib
@@ -114,14 +114,22 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 ### 5. Set up the database
 
-Connect to your PostgreSQL database and create the necessary tables using SQLAlchemy:
+The application uses SQLite by default for development. The database tables will be created automatically when you run the application for the first time.
+
+For production with PostgreSQL, update your `DATABASE_URL` in the `.env` file:
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost/dbname
+```
+
+Then create the tables:
 
 ```bash
 # If you have migration scripts
 alembic upgrade head
 
 # Or create tables programmatically
-python -c "from app.database.models import Base; from app.database.session import engine; Base.metadata.create_all(bind=engine)"
+python -c "from app.database.auth import Base; from app.database.models import Base as ModelsBase; from app.database.session import engine; Base.metadata.create_all(bind=engine); ModelsBase.metadata.create_all(bind=engine)"
 ```
 
 ### 6. Run the FastAPI server

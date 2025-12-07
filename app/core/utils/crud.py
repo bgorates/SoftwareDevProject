@@ -1,8 +1,7 @@
-from typing import Generic, TypeVar, Type, Optional, Union
+from typing import Generic, TypeVar, Type, Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import DatabaseError as AlchemyDatabaseError
-import asyncpg
 from app.core.utils.exceptions import DatabaseError
 
 
@@ -19,11 +18,11 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         self.model = model
     
 
-    def get(self, db:Union[Session, asyncpg.Connection], id: int)-> Optional[ModelType]:
+    def get(self, db: Session, id: int)-> Optional[ModelType]:
         return db.query(self.model).filter(self.model.id == id).first()
     
 
-    def get_all(self, db:Union[Session, asyncpg.Connection], **filters) -> list[ModelType]:
+    def get_all(self, db: Session, **filters) -> list[ModelType]:
        query = db.query(self.model)
        for field, value in filters.items():
            if value is not None and hasattr(self.model, field):
@@ -31,7 +30,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         
        return query.all()
     
-    def batch_create(self, db: Union[Session, asyncpg.Connection], objs_in: Optional[CreateSchemaType]):
+    def batch_create(self, db: Session, objs_in: Optional[CreateSchemaType]):
         objs = [self.model(**obj.model_dump()) for obj in objs_in]
         try:
             db.add_all(objs)
@@ -43,7 +42,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.rollback()
             raise DatabaseError("A database error has occurred during generation. Please try again")
 
-    def create(self, db:Union[Session, asyncpg.Connection], obj_in: Optional[CreateSchemaType]) -> Optional[ModelType]:
+    def create(self, db: Session, obj_in: Optional[CreateSchemaType]) -> Optional[ModelType]:
         obj = self.model(**obj_in.model_dump())
         try:
             db.add(obj)
@@ -54,7 +53,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             db.rollback()
             raise DatabaseError("A database error has occurred during generation. Please try again")
     
-    def update(self, db:Union[Session, asyncpg.Connection], db_obj: ModelType, obj_in:UpdateSchemaType) -> Optional[ModelType]:
+    def update(self, db: Session, db_obj: ModelType, obj_in:UpdateSchemaType) -> Optional[ModelType]:
         try:
             update_data = obj_in.model_dump(exclude_unset=True)
             update_data = {key:value for key, value in update_data.items() if value is not None}
@@ -69,7 +68,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             
 
     
-    def delete(self, db:Union[Session, asyncpg.Connection], id: int):
+    def delete(self, db: Session, id: int):
         try:
             obj = db.query(self.model).get(id)
             if obj:
