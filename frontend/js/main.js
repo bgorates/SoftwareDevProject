@@ -76,7 +76,7 @@ function logout() {
             }
         } else {
             // Fallback if CONFIG not loaded
-            window.location.href = '/pages/auth/login.html';
+            window.location.href = '/pages/auth/admin-login.html';
         }
     }
 }

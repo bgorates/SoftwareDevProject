@@ -20,23 +20,23 @@
                 <div id="successMessage" class="alert alert-success" style="display: none;"></div>
 
                 <div class="form-group">
-                    <label for="firstname">First Name *</label>
-                    <input type="text" id="firstname" class="form-control" required>
+                    <label for="firstname">First Name</label>
+                    <input type="text" id="firstname" class="form-control">
                 </div>
 
                 <div class="form-group">
-                    <label for="lastname">Last Name *</label>
-                    <input type="text" id="lastname" class="form-control" required>
+                    <label for="lastname">Last Name</label>
+                    <input type="text" id="lastname" class="form-control">
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email *</label>
-                    <input type="email" id="email" class="form-control" required>
+                    <label for="email">Email</label>
+                    <input type="email" id="email" class="form-control">
                 </div>
 
                 <div class="form-group">
-                    <label for="tal_role">Role *</label>
-                    <select id="tal_role" class="form-control" required>
+                    <label for="tal_role">Role</label>
+                    <select id="tal_role" class="form-control">
                         <option value="">Select role</option>
                         <option value="manager">Manager</option>
                         <option value="assistant manager">Assistant Manager</option>
@@ -50,8 +50,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="contract_type">Employment Type *</label>
-                    <select id="contract_type" class="form-control" required>
+                    <label for="contract_type">Employment Type</label>
+                    <select id="contract_type" class="form-control">
                         <option value="">Select type</option>
                         <option value="full-time">Full-time</option>
                         <option value="part-time">Part-time</option>
@@ -60,8 +60,11 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="start_date">Start Date *</label>
-                    <input type="date" id="start_date" class="form-control" required>
+                    <label for="is_active">Status</label>
+                    <select id="is_active" class="form-control">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
                 </div>
 
                 <div class="card-footer">
@@ -79,14 +82,15 @@
     <script>
         // Check authentication
         if (!isAuthenticated()) {
-            window.location.href = '../auth/login.html';
+            window.location.href = '../auth/admin-login.html';
         }
 
         // Check if user has permission to create/edit employees
+        // Managers are stored with user_role='user' in the database
         const userRole = getUserRole();
         console.log('Current user role:', userRole);
         
-        if (userRole !== 'manager') {
+        if (userRole !== 'user' && userRole !== 'manager' && userRole !== 'admin') {
             // Hide the form and show permission error
             document.getElementById('employeeForm').style.display = 'none';
             const errorDiv = document.createElement('div');
@@ -104,7 +108,7 @@
         function logout() {
             if (confirm('Are you sure you want to logout?')) {
                 clearAuth();
-                window.location.href = '../auth/login.html';
+                window.location.href = '../auth/admin-login.html';
             }
         }
 
@@ -149,9 +153,9 @@
                 document.getElementById('email').value = talent.email || '';
                 document.getElementById('tal_role').value = talent.tal_role || '';
                 document.getElementById('contract_type').value = talent.contract_type || '';
-                if (talent.start_date) {
-                    document.getElementById('start_date').value = formatDate(talent.start_date);
-                }
+                // Set status - default to true (Active) if not specified
+                const isActive = talent.is_active !== undefined ? talent.is_active : true;
+                document.getElementById('is_active').value = isActive.toString();
             } catch (error) {
                 showError(error.message || 'Failed to load employee data');
             }
@@ -169,18 +173,20 @@
                 email: document.getElementById('email').value.trim(),
                 tal_role: document.getElementById('tal_role').value,
                 contract_type: document.getElementById('contract_type').value,
-                start_date: document.getElementById('start_date').value,
+                is_active: document.getElementById('is_active').value === 'true',
             };
-
-            // Validation
-            const errors = validateRequired(formData);
-            if (Object.keys(errors).length > 0) {
-                showError('Please fill in all required fields');
-                submitBtn.disabled = false;
-                return;
+            
+            // For new employees, set start_date to today (required by backend)
+            if (!isEdit) {
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                formData.start_date = `${year}-${month}-${day}`;
             }
 
-            if (!isValidEmail(formData.email)) {
+            // Validation - only validate email format if email is provided
+            if (formData.email && !isValidEmail(formData.email)) {
                 showError('Please enter a valid email address');
                 submitBtn.disabled = false;
                 return;

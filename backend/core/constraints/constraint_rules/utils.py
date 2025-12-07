@@ -7,8 +7,16 @@ from backend.core.utils.enums import ConstraintType
 
 
 def generate_rule_combinations(data: ConstraintRuleIn) -> list[ConstraintRuleCreate]:
-        days = [day.value for day in (data.day or [])] or [None]
-        shifts = [shift.value for shift in (data.shifts or [])] or [None]
+        # Handle both enum objects and string values
+        if data.day:
+            days = [day.value if hasattr(day, 'value') else day for day in data.day if day is not None]
+        else:
+            days = [None]
+        
+        if data.shifts:
+            shifts = [shift.value if hasattr(shift, 'value') else shift for shift in data.shifts if shift is not None]
+        else:
+            shifts = [None]
 
         rules = []
 

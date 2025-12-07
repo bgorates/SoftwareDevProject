@@ -47,7 +47,9 @@ def get_all_constraints(db: Session,
                                  name=name,
                                  contract_type=contract_type,
                                  is_active=is_active)
-    constraint_exists(constraints)
+    # Return empty list if no constraints found instead of raising error
+    if not constraints:
+        return []
     return [ConstraintOut.model_validate(constraint) for constraint in constraints]
 
         

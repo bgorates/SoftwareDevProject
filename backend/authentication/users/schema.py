@@ -19,10 +19,15 @@ class CreateUser(BaseModel):
         return input.strip().lower()
 
 class UserOut(BaseModel):
+    id: int
     username: str
     email: EmailStr
+    firstname: str
+    lastname: str
     user_role: str
     is_active: bool
+    
+    model_config = {"from_attributes": True}
 
 class InsertUser(BaseModel):
     username: str

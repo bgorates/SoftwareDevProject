@@ -98,12 +98,20 @@ def retrieve_all_talents(
         is_active: Optional filter by active status.
 
     Returns:
-        List of TalentOut objects matching the filters.
-
-    Raises:
-        HTTPException: 404 if no talents found.
+        List of TalentOut objects matching the filters. Returns empty list if no talents found.
     """
-    return get_all_talents(db, name=name, tal_role=tal_role, contract_type=contract_type, is_active=is_active)
+    try:
+        return get_all_talents(db, name=name, tal_role=tal_role, contract_type=contract_type, is_active=is_active)
+    except Exception as e:
+        import logging
+        import traceback
+        logging.error(f"Error in retrieve_all_talents: {e}")
+        logging.error(traceback.format_exc())
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @talents.get("/retrieve_talent/{talent_id}", response_model=TalentOut)
 def retrieve_a_talent(

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Employee Constraint - SlotMeIn</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <style>
+        .constraint-form {
+            max-width: 600px;
+        }
+        
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .day-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            cursor: pointer;
+        }
+        
+        .day-checkbox:hover {
+            background: var(--bg-secondary);
+        }
+        
+        .day-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+        
+        .shift-preferences {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .shift-option {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .shift-option input[type="radio"] {
+            margin-right: 8px;
+        }
+        
+        .disabled-section {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        .disabled-section .day-checkbox {
+            cursor: not-allowed;
+            background: var(--bg-secondary);
+        }
+        
+        .disabled-section .shift-option {
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar-container" data-brand-link="dashboard.html"></div>
+    <div class="container">
+        <div class="page-header">
+            <h1>New Employee Constraint</h1>
+            <p style="color: var(--text-secondary); margin-top: 8px;">Set availability and preferences for employees</p>
+        </div>
+
+        <div class="page-content">
+            <form id="constraintForm" class="constraint-form">
+                <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
+                <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+
+                <div class="form-group">
+                    <label for="talent_id">Employee *</label>
+                    <select id="talent_id" class="form-control" required>
+                        <option value="">Select employee</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="constraint_type">Constraint Type *</label>
+                    <select id="constraint_type" class="form-control" required>
+                        <option value="">Select constraint type</option>
+                        <option value="combination">Combination Constraint</option>
+                        <option value="shift restriction">Shift Restriction Constraint</option>
+                        <option value="availability">Availability Constraint</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="daysSection">
+                    <label>Days Available / Unavailable</label>
+                    <div class="days-grid">
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Monday">
+                            <span>Monday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Tuesday">
+                            <span>Tuesday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Wednesday">
+                            <span>Wednesday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Thursday">
+                            <span>Thursday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Friday">
+                            <span>Friday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Saturday">
+                            <span>Saturday</span>
+                        </label>
+                        <label class="day-checkbox">
+                            <input type="checkbox" name="days" value="Sunday">
+                            <span>Sunday</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="shiftsSection">
+                    <label>Shift Preferences</label>
+                    <div class="shift-preferences">
+                        <label class="shift-option">
+                            <input type="radio" name="shifts" value="am">
+                            <span>Morning</span>
+                        </label>
+                        <label class="shift-option">
+                            <input type="radio" name="shifts" value="pm">
+                            <span>Afternoon</span>
+                        </label>
+                        <label class="shift-option">
+                            <input type="radio" name="shifts" value="lounge">
+                            <span>Evening</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="card-footer">
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='employee-constraints.html'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../../js/config.js"></script>
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script src="../../js/main.js"></script>
+    <script>
+        // Check authentication
+        if (!isAuthenticated()) {
+            window.location.href = '../auth/admin-login.html';
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                clearAuth();
+                window.location.href = '../auth/admin-login.html';
+            }
+        }
+
+        const form = document.getElementById('constraintForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const submitBtn = document.getElementById('submitBtn');
+        const talentSelect = document.getElementById('talent_id');
+        const constraintTypeSelect = document.getElementById('constraint_type');
+        const daysSection = document.getElementById('daysSection');
+        const shiftsSection = document.getElementById('shiftsSection');
+
+        // Load employees
+        async function loadEmployees() {
+            try {
+                const talents = await api.getTalents({ is_active: true });
+                console.log('Loaded talents:', talents);
+                talentSelect.innerHTML = '<option value="">Select employee</option>' +
+                    talents.map(t => {
+                        const id = t.id || t.talent_id || '';
+                        const name = `${t.firstname || ''} ${t.lastname || ''}`.trim() || 'Unnamed Employee';
+                        console.log(`Creating option: value="${id}", text="${name}"`);
+                        return `<option value="${id}">${name}</option>`;
+                    }).join('');
+                console.log('Select element after population:', talentSelect.innerHTML);
+            } catch (error) {
+                console.error('Error loading employees:', error);
+                showError('Failed to load employees');
+            }
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.style.display = 'flex';
+            successMessage.style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            successMessage.textContent = msg;
+            successMessage.style.display = 'flex';
+            errorMessage.style.display = 'none';
+        }
+
+        // Handle constraint type change
+        function updateFieldStates() {
+            const constraintType = constraintTypeSelect.value;
+            
+            if (!constraintType) {
+                // If no constraint type selected, disable both sections
+                initializeFieldStates();
+                return;
+            }
+            
+            // Remove disabled state from both sections
+            daysSection.classList.remove('disabled-section');
+            shiftsSection.classList.remove('disabled-section');
+            
+            // Enable all inputs
+            document.querySelectorAll('input[name="days"]').forEach(cb => {
+                cb.disabled = false;
+            });
+            document.querySelectorAll('input[name="shifts"]').forEach(radio => {
+                radio.disabled = false;
+            });
+            
+            if (constraintType === 'shift restriction') {
+                // Disable days section, enable shifts
+                daysSection.classList.add('disabled-section');
+                document.querySelectorAll('input[name="days"]').forEach(cb => {
+                    cb.disabled = true;
+                    cb.checked = false; // Uncheck all days
+                });
+            } else if (constraintType === 'availability') {
+                // Disable shifts section, enable days
+                shiftsSection.classList.add('disabled-section');
+                document.querySelectorAll('input[name="shifts"]').forEach(radio => {
+                    radio.disabled = true;
+                    radio.checked = false; // Uncheck all shifts
+                });
+            }
+            // If combination, both are already enabled above
+        }
+
+        // Add event listener for constraint type change
+        constraintTypeSelect.addEventListener('change', updateFieldStates);
+        
+        // Initially disable both sections until constraint type is selected
+        function initializeFieldStates() {
+            daysSection.classList.add('disabled-section');
+            shiftsSection.classList.add('disabled-section');
+            document.querySelectorAll('input[name="days"]').forEach(cb => {
+                cb.disabled = true;
+            });
+            document.querySelectorAll('input[name="shifts"]').forEach(radio => {
+                radio.disabled = true;
+            });
+        }
+        
+        // Initialize on page load
+        initializeFieldStates();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            showError('');
+            showSuccess('');
+
+            const talentId = talentSelect.value;
+            console.log('Selected talent ID:', talentId);
+            console.log('Select element:', talentSelect);
+            console.log('All options:', Array.from(talentSelect.options).map(opt => ({ value: opt.value, text: opt.text })));
+            
+            if (!talentId || talentId === '') {
+                showError('Please select an employee');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const constraintType = constraintTypeSelect.value;
+            if (!constraintType) {
+                showError('Please select a constraint type');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            const selectedDays = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(cb => cb.value);
+            const selectedShift = document.querySelector('input[name="shifts"]:checked')?.value;
+
+            // Validate based on constraint type
+            if (constraintType === 'availability' && selectedDays.length === 0) {
+                showError('Please select at least one day for availability constraint');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            if (constraintType === 'shift restriction' && !selectedShift) {
+                showError('Please select a shift preference for shift restriction constraint');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            if (constraintType === 'combination' && (selectedDays.length === 0 || !selectedShift)) {
+                showError('Please select both days and shift preference for combination constraint');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            try {
+                // Step 1: Check if constraint already exists for this employee and delete appropriately
+                console.log('Checking for existing constraints:', { talent_id: parseInt(talentId), type: constraintType });
+                let existingConstraints = [];
+                try {
+                    existingConstraints = await api.getConstraints({ 
+                        talent_id: parseInt(talentId),
+                        is_active: true
+                    });
+                } catch (fetchError) {
+                    // If getConstraints fails (e.g., no constraints exist), continue
+                    console.log('No existing constraints found or error fetching:', fetchError);
+                    existingConstraints = [];
+                }
+                
+                // Determine which constraints to delete based on the selected type
+                const constraintsToDelete = [];
+                
+                if (constraintType === 'availability') {
+                    // Only delete existing "availability" constraints
+                    const availabilityConstraint = Array.isArray(existingConstraints) 
+                        ? existingConstraints.find(c => c.type === 'availability')
+                        : null;
+                    if (availabilityConstraint) {
+                        constraintsToDelete.push(availabilityConstraint);
+                    }
+                } else if (constraintType === 'shift restriction') {
+                    // Only delete existing "shift restriction" constraints
+                    const shiftRestrictionConstraint = Array.isArray(existingConstraints) 
+                        ? existingConstraints.find(c => c.type === 'shift restriction')
+                        : null;
+                    if (shiftRestrictionConstraint) {
+                        constraintsToDelete.push(shiftRestrictionConstraint);
+                    }
+                } else if (constraintType === 'combination') {
+                    // Delete all existing constraints (availability, shift restriction, and combination)
+                    if (Array.isArray(existingConstraints)) {
+                        constraintsToDelete.push(...existingConstraints);
+                    }
+                }
+                
+                // Delete the identified constraints
+                for (const constraintToDelete of constraintsToDelete) {
+                    console.log('Deleting existing constraint:', constraintToDelete);
+                    try {
+                        await api.deleteConstraint(constraintToDelete.id);
+                        console.log('Existing constraint deleted:', constraintToDelete.type);
+                    } catch (deleteError) {
+                        console.error('Error deleting existing constraint:', deleteError);
+                        // Continue anyway - might be a cascade issue or constraint might not exist
+                    }
+                }
+
+                // Step 2: Create the new constraint
+                console.log('Creating constraint with:', { talent_id: parseInt(talentId), type: constraintType });
+                const constraintResult = await api.createConstraint({
+                    talent_id: parseInt(talentId),
+                    type: constraintType
+                });
+                
+                console.log('Constraint created:', constraintResult);
+                const constraintId = constraintResult.id;
+
+                // Step 3: Create constraint rules if days or shifts are selected
+                if (selectedDays.length > 0 || selectedShift) {
+                    const ruleData = {
+                        constraint_id: constraintId,
+                        day: selectedDays.length > 0 ? selectedDays : null,
+                        shifts: selectedShift ? [selectedShift] : null
+                    };
+                    
+                    console.log('Creating constraint rules with:', ruleData);
+                    const createdRules = await api.createConstraintRule(ruleData);
+                    console.log('Constraint rules created successfully:', createdRules);
+                }
+
+                showSuccess('Constraint saved successfully!');
+                
+                setTimeout(() => {
+                    window.location.href = 'employee-constraints.html';
+                }, 1500);
+            } catch (error) {
+                console.error('Error saving constraint:', error);
+                const errorMsg = error.message || 'Failed to save constraint. Please try again.';
+                showError(errorMsg);
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Load employees on page load
+        loadEmployees();
+    </script>
+        <script src="../../components/navbar.js"></script>
+</body>
+</html>
+

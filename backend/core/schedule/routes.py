@@ -96,29 +96,49 @@ async def generate_schedule(
     )
     understaffed_shifts = understaffed.get_all()
 
-    return {
-        "assignments": [
-            {
-                "talent_id": a.talent_id,
-                "shift_id": a.shift_id,
-                "role": a.shift.role_name,
+    # Format assignments to match frontend expectations
+    formatted_assignments = []
+    for a in plan:
+        # Serialize datetime objects to ISO strings
+        start_time_str = a.shift.start_time.isoformat() if hasattr(a.shift.start_time, 'isoformat') else str(a.shift.start_time)
+        end_time_str = a.shift.end_time.isoformat() if hasattr(a.shift.end_time, 'isoformat') else str(a.shift.end_time)
+        
+        formatted_assignments.append({
+            "talent_id": a.talent_id,
+            "shift_id": a.shift_id,
+            "role": str(a.shift.role_name) if a.shift.role_name else None,
+            "shift_name": a.shift.shift_name,
+            "start": start_time_str,  # For backward compatibility
+            "end": end_time_str,      # For backward compatibility
+            "shift": {  # Frontend expects this structure
+                "start_time": start_time_str,
+                "end_time": end_time_str,
                 "shift_name": a.shift.shift_name,
-                "start": a.shift.start_time,
-                "end": a.shift.end_time
-            } for a in plan
-        ],
-        "understaffed": [
-            {
-                "shift_id": u.shift_id,
-                "shift_name": u.shift_name,
-                "role": u.role_name,
-                "required": u.required,
-                "assigned": u.assigned,
-                "missing": u.missing,
-                "start": u.shift_start,
-                "end": u.shift_end
-            } for u in understaffed_shifts
-        ]
+                "role_name": str(a.shift.role_name) if a.shift.role_name else None
+            }
+        })
+    
+    # Format understaffed shifts
+    formatted_understaffed = []
+    for u in understaffed_shifts:
+        start_str = u.shift_start.isoformat() if hasattr(u.shift_start, 'isoformat') else str(u.shift_start)
+        end_str = u.shift_end.isoformat() if hasattr(u.shift_end, 'isoformat') else str(u.shift_end)
+        
+        formatted_understaffed.append({
+            "shift_id": u.shift_id,
+            "shift_name": u.shift_name,
+            "role": str(u.role_name) if u.role_name else None,
+            "required": u.required,
+            "assigned": u.assigned,
+            "missing": u.missing,
+            "start": start_str,
+            "end": end_str
+        })
+    
+    return {
+        "assignments": formatted_assignments,
+        "generated_assignments": formatted_assignments,  # Frontend looks for this (with typo: genereated_assignments)
+        "understaffed": formatted_understaffed
     }
 
 

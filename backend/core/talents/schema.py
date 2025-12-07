@@ -59,6 +59,7 @@ class TalentUpdate(BaseModel):
         return value.lower()
 
 class TalentOut(BaseModel):
+    id: int
     firstname: str
     lastname: str
     tal_role: str

@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends,Body
+from fastapi import APIRouter, Depends, Body, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import Annotated
-from backend.authentication.users.schema import CreateUser, InviteTarget, NewPassword
+from backend.authentication.users.schema import CreateUser, InviteTarget, NewPassword, UserOut
 from backend.authentication.tokens.schema import TokenIn, TokenOut
 from backend.database.session import session
+from backend.database.auth import User
 from backend.authentication.users.service import UserService
+from backend.authentication.utils.auth_utils import get_current_user
 
 auth_router = APIRouter(tags=['Users'])
 
@@ -32,6 +34,27 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
                                   db: Annotated[Session, Depends(session)]):
     login = UserService.login(form_data=form_data, db=db)
     return login
+
+@auth_router.get("/list", response_model=list[UserOut])
+def list_users(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(session)],
+    role: str | None = Query(None, description="Filter users by role (e.g., 'manager', 'user', 'superuser')")
+):
+    """
+    List all users, optionally filtered by role.
+    
+    Requires authentication. Only superusers should typically access this endpoint.
+    
+    Args:
+        current_user: Authenticated user making the request.
+        db: Database session.
+        role: Optional role filter.
+        
+    Returns:
+        List of UserOut objects.
+    """
+    return UserService.list_users(db=db, role=role)
   
   
  

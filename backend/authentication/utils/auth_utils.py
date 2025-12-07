@@ -64,7 +64,8 @@ def authenticate_user(db: Session, username: str, password: str) -> User:
         User object if authentication is successful.
 
     Raises:
-        HTTPException: 404 if user doesn't exist, 401 if password is incorrect.
+        HTTPException: 404 if user doesn't exist, 401 if password is incorrect, 
+                       500 if password hash is malformed.
     """
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -73,11 +74,18 @@ def authenticate_user(db: Session, username: str, password: str) -> User:
             detail="User does not exist"
         )
     
-    if not verify_password(password=password, hash=user.pwd_hash):
+    try:
+        if not verify_password(password=password, hash=user.pwd_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+    except ValueError as e:
+        # Handle malformed password hash
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"}
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication error: {str(e)}. Please contact an administrator to reset your password."
         )
     
     return user

@@ -16,17 +16,18 @@ from backend.authentication.utils.auth_utils import get_current_user
 
 constraint_rules = APIRouter(tags=['Constraint Rules'])
 
-@constraint_rules.post("/create", response_model=ConstraintRuleOut)
+@constraint_rules.post("/create", response_model=list[ConstraintRuleOut])
 def create_constraint_rule(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(session)],
     data: Annotated[ConstraintRuleIn, Body()]
 ):
     """
-    Create a new constraint rule.
+    Create new constraint rules.
 
-    Requires authentication. Creates a rule specifying which days/shifts a talent
-    is unavailable (e.g., cannot work Monday mornings).
+    Requires authentication. Creates rules specifying which days/shifts a talent
+    is unavailable (e.g., cannot work Monday mornings). Can create multiple rules
+    if multiple days and/or shifts are provided.
 
     Args:
         current_user: Authenticated user making the request.
@@ -34,14 +35,14 @@ def create_constraint_rule(
         data: Rule data including constraint_id, days, and shifts.
 
     Returns:
-        ConstraintRuleOut: Created constraint rule record.
+        List[ConstraintRuleOut]: Created constraint rule records.
 
     Raises:
         HTTPException: 404 if constraint not found, 409 if rule already exists,
                       400 if validation fails.
     """
-    constraint_rule = ConstraintRuleService().create_rules(db=db, data=data)
-    return constraint_rule
+    constraint_rules = ConstraintRuleService().create_rules(db=db, data=data)
+    return constraint_rules
 
 @constraint_rules.delete("/delete/{rule_id}", status_code=204)
 def delete_constraint_rule(

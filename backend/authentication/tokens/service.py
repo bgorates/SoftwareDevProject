@@ -50,11 +50,12 @@ class TokenService:
     def decode_token(token: str) -> Payload:
 
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[algorithm])
-            if not payload:
+            payload_dict = jwt.decode(token, SECRET_KEY, algorithms=[algorithm])
+            if not payload_dict:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                   detail="Invalid token")
-            return payload
+            # Convert dictionary to Payload object
+            return Payload(**payload_dict)
     
         except ExpiredSignatureError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired",headers={"WWW-Authenticate": "Bearer"})
@@ -81,8 +82,8 @@ class TokenService:
     
     @staticmethod
     def search_token(db: Session, token: str, type:TokenType):
-        payload: dict = TokenService.decode_token(token=token)
-        jti = payload.get("jti")
+        payload: Payload = TokenService.decode_token(token=token)
+        jti = payload.jti
         if not jti:
             raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 

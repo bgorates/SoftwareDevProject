@@ -77,6 +77,26 @@ class UserService():
         TokenService.store_token(db=db, data=payload, jwt=access_token)
         return TokenOut(access_token=access_token,token_type="bearer",role=user.user_role)
     
+    @staticmethod
+    def list_users(db: Session, role: str | None = None):
+        """
+        List all users, optionally filtered by role.
+        
+        Args:
+            db: Database session.
+            role: Optional role filter (e.g., 'manager', 'user', 'superuser').
+            
+        Returns:
+            List of UserOut objects.
+        """
+        query = db.query(User)
+        
+        if role:
+            query = query.filter(User.user_role == role)
+        
+        users = query.all()
+        return [UserOut.model_validate(user) for user in users]
+    
     
         
 

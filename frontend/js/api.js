@@ -39,7 +39,7 @@ const API_ENDPOINTS = {
     
     // Shift Period endpoints
     GET_PERIODS: '/shift_period/retrieve_all_periods',
-    GET_PERIOD: '/shift_period/retrive_period',
+    GET_PERIOD: '/shift_period/retrieve_period',
     
     // Schedule endpoints
     GENERATE_SCHEDULE: '/schedule/generate',
@@ -105,12 +105,27 @@ async function apiRequest(endpoint, options = {}) {
         const response = await fetch(url, config);
         console.log('Response status:', response.status); // Debug log
         
-        // Handle non-JSON responses
+        // Handle non-JSON responses and 204 No Content
         const contentType = response.headers.get('content-type');
         let data;
         
-        if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
+        // For 204 No Content, there's no response body - return empty object
+        if (response.status === 204) {
+            data = {};
+        } else if (contentType && contentType.includes('application/json')) {
+            try {
+                const text = await response.text();
+                // Only parse JSON if there's actual content
+                if (text && text.trim()) {
+                    data = JSON.parse(text);
+                } else {
+                    data = {};
+                }
+            } catch (e) {
+                // If JSON parsing fails (e.g., empty or invalid JSON), return empty object
+                console.warn('Failed to parse JSON response:', e);
+                data = {};
+            }
         } else {
             const text = await response.text();
             data = text ? { detail: text } : {};
@@ -119,8 +134,10 @@ async function apiRequest(endpoint, options = {}) {
         if (!response.ok) {
             // Handle 401 Unauthorized
             if (response.status === 401) {
-                const isLoginPage = window.location.pathname.includes('/login.html') || 
+                const isLoginPage = window.location.pathname.includes('/admin-login.html') || 
+                                   window.location.pathname.includes('/login.html') ||
                                    window.location.pathname.includes('/superuser-login.html') ||
+                                   window.location.pathname.includes('/pages/auth/admin-login.html') ||
                                    window.location.pathname.includes('/pages/auth/login.html') ||
                                    window.location.pathname.includes('/pages/auth/superuser-login.html');
                 

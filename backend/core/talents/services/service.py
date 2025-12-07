@@ -107,22 +107,37 @@ def get_all_talents(
         is_active: Optional filter by active status.
 
     Returns:
-        List of TalentOut objects matching the filters.
-
-    Raises:
-        HTTPException: 404 if no talents found.
+        List of TalentOut objects matching the filters. Returns empty list if no talents found.
     """
-    query = db.query(Talent)
-    talent_exists(query)
-    talents = search_filters(
-        query=query,
-        name=name,
-        tal_role=tal_role,
-        contract_type=contract_type,
-        is_active=is_active
-    )
-    talent_exists(talents)
-    return [TalentOut.model_validate(talent) for talent in talents]
+    try:
+        query = db.query(Talent)
+        talents = search_filters(
+            query=query,
+            name=name,
+            tal_role=tal_role,
+            contract_type=contract_type,
+            is_active=is_active
+        )
+        # Return empty list if no talents found (don't raise 404 for list endpoint)
+        if not talents:
+            return []
+        
+        # Validate and convert each talent, skipping any that fail validation
+        result = []
+        for talent in talents:
+            try:
+                result.append(TalentOut.model_validate(talent))
+            except Exception as e:
+                # Log validation error but continue with other talents
+                import logging
+                logging.error(f"Failed to validate talent {talent.id}: {e}")
+                continue
+        
+        return result
+    except Exception as e:
+        import logging
+        logging.error(f"Error in get_all_talents: {e}", exc_info=True)
+        raise
         
     
 def get_talent(db: Session, id: int) -> TalentOut:

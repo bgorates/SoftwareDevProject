@@ -45,18 +45,27 @@ function createNavbar(options = {}) {
 document.addEventListener('DOMContentLoaded', () => {
     const navbarContainer = document.getElementById('navbar-container');
     if (navbarContainer) {
-        // Use absolute path to dashboard from frontend root
-        const defaultBrandLink = '/pages/employees/dashboard.html';
-        let brandLink = navbarContainer.dataset.brandLink || defaultBrandLink;
+        // Get user role to determine correct dashboard
+        const userRole = getUserRole();
         
-        // Convert relative "dashboard.html" to absolute path
+        // Use absolute path to dashboard from frontend root
+        const defaultEmployeeDashboard = '/pages/employees/dashboard.html';
+        const defaultSuperuserDashboard = '/pages/superuser/superuser-dashboard.html';
+        
+        let brandLink = navbarContainer.dataset.brandLink || defaultEmployeeDashboard;
+        
+        // Convert relative "dashboard.html" to absolute path based on user role
         if (brandLink === 'dashboard.html') {
-            brandLink = defaultBrandLink;
+            // If user is superuser, redirect to superuser dashboard
+            // Otherwise, redirect to employee dashboard
+            brandLink = (userRole === 'superuser') 
+                ? defaultSuperuserDashboard 
+                : defaultEmployeeDashboard;
         }
         
         const options = {
             brandLink: brandLink,
-            userRole: getUserRole()
+            userRole: userRole
         };
         navbarContainer.innerHTML = createNavbar(options);
     }
