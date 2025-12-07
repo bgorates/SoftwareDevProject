@@ -65,6 +65,7 @@ class TalentOut(BaseModel):
     contract_type: str
     hours: int
     is_active: bool
+    
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     
