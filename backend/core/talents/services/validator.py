@@ -78,7 +78,8 @@ def validate_talent_update(data: TalentUpdate, talent: Talent) -> None:
             detail="Talent not found"
         )
 
-    if data.is_active is True:
+    # Only prevent reactivation (inactive → active), not updates to active employees
+    if data.is_active is True and talent.is_active is False:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Reactivation is not allowed. Please create a new talent profile."

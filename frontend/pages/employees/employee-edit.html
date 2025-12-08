@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create/Edit Employee - SlotMeIn</title>
     <link rel="stylesheet" href="../../css/main.css">
 </head>
+
 <body>
     <div id="navbar-container" data-brand-link="dashboard.html"></div>
     <div class="container">
         <div class="page-header">
             <h1 id="pageTitle">Create Employee</h1>
-            <p style="color: var(--text-secondary); margin-top: 8px;" id="pageSubtitle">Add a new employee to your team</p>
+            <p style="color: var(--text-secondary); margin-top: 8px;" id="pageSubtitle">Add a new employee to your team
+            </p>
         </div>
 
         <div class="page-content">
@@ -68,7 +71,8 @@
                 </div>
 
                 <div class="card-footer">
-                    <button type="button" class="btn btn-secondary" onclick="window.location.href='employee-list.html'">Cancel</button>
+                    <button type="button" class="btn btn-secondary"
+                        onclick="window.location.href='employee-list.html'">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="submitBtn">Save</button>
                 </div>
             </form>
@@ -89,7 +93,7 @@
         // Managers are stored with user_role='user' in the database
         const userRole = getUserRole();
         console.log('Current user role:', userRole);
-        
+
         if (userRole !== 'user' && userRole !== 'manager' && userRole !== 'admin') {
             // Hide the form and show permission error
             document.getElementById('employeeForm').style.display = 'none';
@@ -175,9 +179,18 @@
                 contract_type: document.getElementById('contract_type').value,
                 is_active: document.getElementById('is_active').value === 'true',
             };
-            
-            // For new employees, set start_date to today (required by backend)
-            if (!isEdit) {
+
+            // For editing: remove empty fields to avoid validation errors
+            // Backend expects null for optional fields, not empty strings
+            if (isEdit) {
+                // Only include fields that have actual values
+                Object.keys(formData).forEach(key => {
+                    if (formData[key] === '' || formData[key] === null || formData[key] === undefined) {
+                        delete formData[key];
+                    }
+                });
+            } else {
+                // For new employees, set start_date to today (required by backend)
                 const today = new Date();
                 const year = today.getFullYear();
                 const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -200,7 +213,7 @@
                     await api.createTalent(formData);
                     showSuccess('Employee created successfully!');
                 }
-                
+
                 setTimeout(() => {
                     window.location.href = 'employee-list.html';
                 }, 1500);
@@ -210,7 +223,7 @@
             }
         });
     </script>
-        <script src="../../components/navbar.js"></script>
+    <script src="../../components/navbar.js"></script>
 </body>
-</html>
 
+</html>
