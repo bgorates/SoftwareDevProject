@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedule History - SlotMeIn</title>
     <link rel="stylesheet" href="../../css/main.css">
 </head>
+
 <body>
     <div id="navbar-container" data-brand-link="dashboard.html"></div>
     <div class="container">
@@ -17,7 +19,7 @@
         <div class="page-content">
             <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
             <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
-            
+
             <div class="table-container" id="historyTable" style="display: none;">
                 <table>
                     <thead>
@@ -37,7 +39,9 @@
 
             <div id="emptyState" class="empty-state" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M8 7V3M16 7V3M3 11H21M5 5H19C20.1046 5 21 5.89543 21 7V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V7C3 5.89543 3.89543 5 5 5Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path
+                        d="M8 7V3M16 7V3M3 11H21M5 5H19C20.1046 5 21 5.89543 21 7V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V7C3 5.89543 3.89543 5 5 5Z"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
                 <h3>No schedule history</h3>
                 <p>Published schedules will appear here</p>
@@ -75,14 +79,8 @@
             emptyState.style.display = 'none';
 
             try {
-                // Note: This endpoint needs to be created in backend
-                // GET /schedule/history or similar
-                showError('Backend endpoint for schedule history not yet implemented.');
-                
-                // When available:
-                // const history = await apiRequest('/schedule/history', { method: 'GET' });
-                // renderHistory(history);
-                
+                const history = await api.getSchedules();
+                renderHistory(history);
             } catch (error) {
                 errorMessage.textContent = error.message || 'Failed to load schedule history';
                 errorMessage.style.display = 'flex';
@@ -98,15 +96,18 @@
             }
 
             historyTableBody.innerHTML = history.map(item => {
-                const weekStart = new Date(item.week_start || item.start_date);
+                const weekStart = new Date(item.week_start);
+                const statusClass = item.status === 'generated' ? 'badge-success' : 'badge-warning';
+                const statusText = item.status.charAt(0).toUpperCase() + item.status.slice(1);
+
                 return `
                     <tr>
                         <td>${formatDate(weekStart)}</td>
                         <td>${formatWeekRange(weekStart)}</td>
                         <td>
-                            <span class="badge badge-success">Published</span>
+                            <span class="badge ${statusClass}">${statusText}</span>
                         </td>
-                        <td>${formatDateTime(item.published_at || item.created_at)}</td>
+                        <td>${item.scheduled_shifts ? item.scheduled_shifts.length : 0} shifts</td>
                         <td>
                             <button class="action-btn action-btn-primary" onclick="viewSchedule('${formatDate(weekStart)}')">View</button>
                         </td>
@@ -124,7 +125,7 @@
         // Load history on page load
         loadHistory();
     </script>
-        <script src="../../components/navbar.js"></script>
+    <script src="../../components/navbar.js"></script>
 </body>
-</html>
 
+</html>

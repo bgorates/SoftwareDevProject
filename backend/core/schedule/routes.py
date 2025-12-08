@@ -5,14 +5,15 @@ This module provides the main endpoint for generating optimized work schedules
 based on shift requirements, talent availability, and constraints.
 """
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import date
 from typing import Annotated
 
 from backend.database.session import session
 from backend.database.auth import User
-from backend.core.schedule.schema import inputDate
+from backend.database.models import Schedule, ScheduledShift
+from backend.core.schedule.schema import inputDate, ScheduleOut
 from backend.core.schedule.shifts.service import ShiftSlotBuilder
 from backend.core.schedule.talents.repo import TalentRepository
 from backend.core.schedule.talents.preprocessor import TalentPreprocessor
@@ -66,6 +67,11 @@ async def generate_schedule(
     """
     # 1. Get all the dates to schedule
     week_provider = weekRange(start_date=start_date.start_date)
+    
+    # Calculate week dates for database save
+    week_dates = week_provider.get_week()
+    week_start = week_dates[0]
+    week_end = week_dates[-1]
 
     # 2. Build the shift slots
     slots_builder = ShiftSlotBuilder(db=db, start_date=week_provider.get_week()[0])
@@ -135,15 +141,115 @@ async def generate_schedule(
             "end": end_str
         })
     
+    # Save to database
+    try:
+        # Create Schedule record
+        new_schedule = Schedule(
+            week_start=week_start,
+            week_end=week_end,
+            status="generated"
+        )
+        db.add(new_schedule)
+        db.flush()  # Get ID without committing
+        
+        # Create ScheduledShift records
+        for assignment in plan:
+            # Extract date from datetime
+            shift_date = assignment.shift.start_time.date()
+            
+            # Extract time components
+            start_time = assignment.shift.start_time.time()
+            end_time = assignment.shift.end_time.time()
+            
+            # Calculate hours
+            time_diff = assignment.shift.end_time - assignment.shift.start_time
+            shift_hours = time_diff.total_seconds() / 3600
+            
+            scheduled_shift = ScheduledShift(
+                talent_id=assignment.talent_id,  # Use talent_id directly from assignment
+                date_of=shift_date,
+                start_time=start_time,
+                end_time=end_time,
+                shift_hours=round(shift_hours, 2),
+                schedule_id=new_schedule.id
+            )
+            db.add(scheduled_shift)
+        
+        # Commit all changes
+        db.commit()
+        db.refresh(new_schedule)
+        
+        # Serialize schedule for response
+        schedule_out = ScheduleOut.model_validate(new_schedule)
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save schedule to database: {str(e)}"
+        )
+    
     return {
         "assignments": formatted_assignments,
         "generated_assignments": formatted_assignments,  # Frontend looks for this (with typo: genereated_assignments)
-        "understaffed": formatted_understaffed
+        "understaffed": formatted_understaffed,
+        "schedule": schedule_out.model_dump(),
+        "success": True
     }
 
 
+@schedule.get("/list", response_model=list[ScheduleOut])
+def list_schedules(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(session)]
+):
+    """
+    Get all schedules ordered by week start date descending.
+    
+    Used by the schedule history page to display all generated schedules.
+    
+    Args:
+        current_user: Authenticated user making the request.
+        db: Database session for querying.
+        
+    Returns:
+        List of ScheduleOut objects for all schedules.
+    """
+    schedules = db.query(Schedule).order_by(Schedule.week_start.desc()).all()
+    return [ScheduleOut.model_validate(s) for s in schedules]
 
 
+@schedule.get("/week/{week_start}", response_model=ScheduleOut)
+def get_schedule_by_week(
+    week_start: date,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(session)]
+):
+    """
+    Get schedule for a specific week.
+    
+    Used by the schedule view page to display a saved schedule.
+    
+    Args:
+        week_start: Start date of the week (YYYY-MM-DD).
+        current_user: Authenticated user making the request.
+        db: Database session for querying.
+        
+    Returns:
+        ScheduleOut object with schedule and all shifts for that week.
+        
+    Raises:
+        HTTPException: 404 if no schedule found for that week.
+    """
+    schedule = db.query(Schedule).filter(Schedule.week_start == week_start).first()
+    
+    if not schedule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No schedule found for week starting {week_start.isoformat()}"
+        )
+    
+    return ScheduleOut.model_validate(schedule)
 
 
 

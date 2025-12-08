@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,35 +11,33 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 24px;
+            overflow-x: auto;
         }
-        
+
         .schedule-table th,
         .schedule-table td {
             padding: 12px;
             border: 1px solid var(--border-color);
-            text-align: left;
+            text-align: center;
+            min-width: 120px;
         }
-        
+
         .schedule-table th {
             background: var(--bg-tertiary);
             font-weight: 600;
         }
-        
-        .employee-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        
-        .employee-badge {
-            background: var(--primary-color);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 16px;
-            font-size: 12px;
+
+        .schedule-table td:first-child,
+        .schedule-table th:first-child {
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            left: 0;
+            background: white;
         }
     </style>
 </head>
+
 <body>
     <div id="navbar-container" data-brand-link="dashboard.html"></div>
     <div class="container">
@@ -46,7 +45,8 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h1>Published Schedule</h1>
-                    <p style="color: var(--text-secondary); margin-top: 8px;" id="weekRange">Read-only view of the final schedule</p>
+                    <p style="color: var(--text-secondary); margin-top: 8px;" id="weekRange">Read-only view of the final
+                        schedule</p>
                 </div>
                 <a href="schedule-history.html" class="btn btn-secondary">View History</a>
             </div>
@@ -55,14 +55,13 @@
         <div class="page-content">
             <div id="loadingSpinner" class="loading-spinner" style="display: none;"></div>
             <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
-            
-            <div id="scheduleContainer" style="display: none;">
+
+            <div id="scheduleContainer" style="display: none; overflow-x: auto;">
                 <table class="schedule-table">
                     <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Shift</th>
-                            <th>Employee(s)</th>
+                        <tr id="scheduleHeaderRow">
+                            <th>Employee</th>
+                            <!-- Dates will be added dynamically -->
                         </tr>
                     </thead>
                     <tbody id="scheduleTableBody">
@@ -110,14 +109,23 @@
             scheduleContainer.style.display = 'none';
 
             try {
-                const schedule = await api.viewSchedule(weekStart);
-                renderSchedule(schedule);
-                
+                const schedule = await api.getScheduleByWeek(weekStart);
+
+                // Load employees to get names
+                const employees = await api.getTalents({ is_active: true });
+                const employeeMap = {};
+                employees.forEach(emp => {
+                    employeeMap[emp.id] = `${emp.firstname || ''} ${emp.lastname || ''}`.trim();
+                });
+
+                renderSchedule(schedule, employeeMap);
+
                 if (weekStart) {
                     const start = new Date(weekStart);
                     weekRangeEl.textContent = `Week: ${formatWeekRange(start)}`;
                 }
             } catch (error) {
+                console.error('Load error:', error);
                 errorMessage.textContent = error.message || 'Failed to load schedule';
                 errorMessage.style.display = 'flex';
             } finally {
@@ -125,27 +133,69 @@
             }
         }
 
-        function renderSchedule(schedule) {
-            // This will depend on the schedule data structure from backend
-            // For now, showing a placeholder structure
-            if (!schedule || schedule.length === 0) {
-                scheduleTableBody.innerHTML = '<tr><td colspan="3" class="text-center">No schedule data available</td></tr>';
-            } else {
-                scheduleTableBody.innerHTML = schedule.map(item => `
-                    <tr>
-                        <td>${formatDate(item.date || item.shift_date)}</td>
-                        <td>${item.shift_name || item.shift} (${formatTime(item.start_time)} - ${formatTime(item.end_time)})</td>
-                        <td>
-                            <div class="employee-list">
-                                ${(item.employees || []).map(emp => 
-                                    `<span class="employee-badge">${emp.firstname} ${emp.lastname}</span>`
-                                ).join('')}
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
+        function renderSchedule(schedule, employeeMap) {
+            if (!schedule || !schedule.scheduled_shifts || schedule.scheduled_shifts.length === 0) {
+                scheduleTableBody.innerHTML = '<tr><td colspan="8" class="text-center">No schedule data available</td></tr>';
+                scheduleContainer.style.display = 'block';
+                return;
             }
 
+            // Get all unique dates and sort them
+            const dates = [...new Set(schedule.scheduled_shifts.map(s => s.date_of))].sort();
+
+            // Build header row with dates
+            const headerRow = document.getElementById('scheduleHeaderRow');
+            headerRow.innerHTML = '<th>Employee</th>' + dates.map(dateStr => {
+                const date = new Date(dateStr);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return `<th>${dayName}<br>${monthDay}</th>`;
+            }).join('');
+
+            // Group shifts by employee and date
+            const employeeSchedules = {};
+
+            schedule.scheduled_shifts.forEach(shift => {
+                const empId = shift.talent_id;
+                const dateKey = shift.date_of;
+
+                if (!employeeSchedules[empId]) {
+                    employeeSchedules[empId] = {
+                        name: employeeMap[empId] || `Employee ${empId}`,
+                        shifts: {}
+                    };
+                }
+
+                // Store shift info for this date
+                const startTime = formatTime(shift.start_time);
+                const endTime = formatTime(shift.end_time);
+                employeeSchedules[empId].shifts[dateKey] = `${startTime} - ${endTime}`;
+            });
+
+            // Build table rows
+            const rows = Object.keys(employeeSchedules).sort((a, b) => {
+                return employeeSchedules[a].name.localeCompare(employeeSchedules[b].name);
+            }).map(empId => {
+                const emp = employeeSchedules[empId];
+
+                const cells = dates.map(dateStr => {
+                    const shiftTime = emp.shifts[dateStr];
+                    if (shiftTime) {
+                        return `<td>${shiftTime}</td>`;
+                    } else {
+                        return `<td style="color: var(--text-secondary);">OFF</td>`;
+                    }
+                }).join('');
+
+                return `
+                    <tr>
+                        <td>${emp.name}</td>
+                        ${cells}
+                    </tr>
+                `;
+            }).join('');
+
+            scheduleTableBody.innerHTML = rows;
             scheduleContainer.style.display = 'block';
         }
 
@@ -157,7 +207,7 @@
             errorMessage.style.display = 'flex';
         }
     </script>
-        <script src="../../components/navbar.js"></script>
+    <script src="../../components/navbar.js"></script>
 </body>
-</html>
 
+</html>
