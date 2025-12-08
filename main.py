@@ -41,6 +41,9 @@ app.mount("/components", StaticFiles(directory=str(frontend_path / "components")
 # Mount pages directory for static assets (CSS, JS files within pages)
 app.mount("/pages", StaticFiles(directory=str(frontend_path / "pages")), name="pages")
 
+# Mount entire frontend directory to serve all files
+app.mount("/frontend", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+
 # Serve frontend pages (HTML files)
 @app.get("/")
 async def read_root():

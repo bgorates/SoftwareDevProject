@@ -37,7 +37,7 @@ def send_email(to_email:str, subject: str, body: str):
 def invite_message(invite_token: str, user: User):
     
     INVITE_EXPIRY_HOURS = 24
-    invite_link = f"https://shiftly.app/register?token={invite_token}"
+    invite_link = f"http://127.0.0.1:8000/frontend/pages/auth/set-password.html?token={invite_token}"
     name = user.username.split(".")[0].capitalize()
 
     subject = "You've been invited to Shiftly!"

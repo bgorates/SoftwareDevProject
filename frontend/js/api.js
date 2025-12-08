@@ -390,6 +390,16 @@ const api = {
             method: 'GET',
         });
     },
+
+    setNewPassword: async (token, newPassword) => {
+        return apiRequest('/users/set_new_password', {
+            method: 'POST',
+            body: JSON.stringify({
+                token: token,
+                new_password: newPassword
+            }),
+        });
+    },
 };
 
 // Clear authentication
