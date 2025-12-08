@@ -178,3 +178,4 @@ Use the `/schedule/generate` endpoint with a POST request containing a start dat
 The API will return:
 - **assignments**: List of talent-to-shift assignments with details
 - **understaffed**: List of shifts that couldn't be fully staffed
+
