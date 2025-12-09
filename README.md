@@ -74,18 +74,29 @@ The system provides a complete backend solution with authentication, database ma
 
 ```
 Scheduler App/
-├── frontend/           # Frontend application
-│   ├── index.html     # Entry point
-│   ├── css/           # Stylesheets
-│   ├── js/            # JavaScript files
-│   └── pages/         # HTML pages
-├── backend/           # Backend application
-│   ├── authentication/  # Auth routes and services
-│   ├── config/         # Configuration
-│   ├── core/           # Core business logic
-│   ├── database/       # Database models and sessions
-│   └── requirements.txt
-└── main.py            # FastAPI application entry point
+├── frontend/                 # Frontend Application (HTML/JS)
+│   ├── index.html            # Entry Point
+│   ├── css/                  # Global Styles
+│   ├── js/                   # Application Logic
+│   └── pages/                # View Templates
+│
+├── backend/                  # Backend Application (FastAPI)
+│   ├── authentication/       # JWT Auth & Security
+│   ├── config/               # Environment Configuration
+│   ├── core/                 # Core Domain Logic
+│   │   ├── constraints/      # Constraint Rules & Validators
+│   │   ├── schedule/         # Scheduling Engine
+│   │   │   ├── allocator/    # Genetic Algorithm & Scoring
+│   │   │   └── shifts/       # Shift Definition Logic
+│   │   ├── talents/          # Staff Management Logic
+│   │   └── utils/            # Shared Utilities
+│   ├── database/             # Data Layer
+│   │   ├── models.py         # SQLAlchemy ORM Models
+│   │   └── session.py        # Database Connection
+│   └── main.py               # API Entry Point
+│
+├── tests/                    # Test Suite
+└── README.md                 # Project Documentation
 ```
 
 ## Setup
